@@ -1,13 +1,8 @@
+const fs = require('fs');
+const axios = require('axios');
 const express = require('express');
 const multer = require('multer');
-const fs = require('fs');
-require('dotenv').config();
 const cors = require('cors');
-const Tesseract = require('tesseract.js');
-const Jimp = require('jimp');
-
-const imagePath = 'images/image.png';
-const enhancedImagePath = 'images/enhanced_image.png';
 
 const app = express();
 const port = process.env.PORT || 3001;
@@ -17,68 +12,89 @@ app.use(cors());
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
 
-const enhanceImageContrast = async (imageBuffer, outputPath) => {
-    try {
-        const image = await Jimp.read(imageBuffer);
-        await image.contrast(0).write(outputPath);
-    } catch (error) {
-        console.error('Error enhancing image contrast:', error.message);
-        throw error;
-    }
-};
+// Provide your username and license code
+const licenseCode = '7A8E3419-481C-4535-8655-00F7B4DAD65B';
+const userName = 'kapalikkhanal';
 
-const performOCR = async (imagePath) => {
+// Specify OCR settings
+const requestUrl = 'http://www.ocrwebservice.com/restservices/processDocument?gettext=true';
+
+async function performOCR(imageBuffer) {
     try {
-        Tesseract.recognize(
-            imagePath,
-            'eng',
-            {
-                logger: (info) => console.log(info),
-                config: {
-                    tessedit_pageseg_mode: '6', // Assume a single uniform block of text
-                    dpi: 3000, // Set DPI (adjust the value as needed)
-                },
-            }
-        ).then(({ data: { text } }) => {
-            console.log('Recognized Text: /n', text);
+        const response = await axios.post(requestUrl, imageBuffer, {
+            auth: {
+                username: userName,
+                password: licenseCode,
+            },
+            headers: {
+                'Content-Type': 'application/octet-stream',
+            },
         });
+
+        if (response.status === 401) {
+            // Unauthorized request
+            console.log('Unauthorized request');
+            return { success: false, error: 'Unauthorized request' };
+        }
+
+        const data = response.data;
+
+        // Decode Output response
+        const ocrError = data.ErrorMessage;
+
+        if (ocrError !== '') {
+            // Error occurs during recognition
+            console.log('Recognition Error: ' + ocrError);
+            return { success: false, error: 'Recognition Error: ' + ocrError };
+        }
+
+        // Task description
+        console.log('Task Description: ' + data.TaskDescription);
+
+        // Available pages
+        console.log('Available Pages: ' + data.AvailablePages);
+
+        // Processed pages
+        console.log('Processed Pages: ' + data.ProcessedPages);
+
+        // Extracted text from the first or single page
+        console.log('Extracted Text: ' + data.OCRText[0][0]);
+
+        // Get extracted text from the First zone for each page
+        console.log('Zone 1 Page 1 Text: ' + data.OCRText[0][0]);
+        console.log('Zone 1 Page 2 Text: ' + data.OCRText[0][1]);
+
+        return {
+            success: true,
+            message: 'OCR performed successfully',
+            ocrText: data.OCRText[0][0], // Adjust this line based on your requirements
+        };
     } catch (error) {
-        console.error('Error performing OCR:', error.message);
+        console.error('Error during OCR:', error.message);
+        return { success: false, error: 'Error during OCR: ' + error.message };
     }
-};
+}
+
 
 app.get('/', (req, res) => {
     res.status(200).json('Server working fine.');
 });
 
-const imagesFolder = './images';
-if (!fs.existsSync(imagesFolder)) {
-    fs.mkdirSync(imagesFolder);
-}
-
 app.post('/api/upload', upload.single('image'), async (req, res) => {
     try {
         console.log('File received:', req.file);
-        fileBuffer = req.file.buffer;
-        const fileName = `image_${Date.now()}.png`;
-        const filePath = `${imagesFolder}/${fileName}`;
+        const imageBuffer = req.file.buffer;
 
-        fs.writeFileSync(filePath, fileBuffer);
+        // Execute OCR on the image buffer
+        const ocrResult = await performOCR(imageBuffer);
 
-        // await enhanceImageContrast(fileBuffer, enhancedImagePath);
-
-        // Execute OCR on the enhanced image
-        performOCR(imagePath);
-
-        res.status(200).json({ success: true, message: 'File uploaded successfully', imagePath: filePath });
+        res.status(200).json(ocrResult);
     } catch (error) {
         console.error('Error:', error);
         res.status(500).json({ success: false, error: 'Internal Server Error' });
     }
 });
 
-// performOCR('images/image_1701342167833.png');
-// server\
 
 app.listen(port, () => {
     console.log(`Server is running at http://localhost:${port}`);
