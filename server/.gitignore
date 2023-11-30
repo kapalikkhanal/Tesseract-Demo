@@ -1,0 +1,37 @@
+# Node.js
+node_modules/
+
+# Compiled binaries
+*.rsc
+*.dll
+*.exe
+*.o
+*.so
+*.dylib
+
+# Dependency directories
+npm-debug.log
+yarn-error.log
+pnp.js
+
+# dotenv environment variables file
+.env
+
+# Production build directory
+build/
+
+# Mac OS system files
+.DS_Store
+
+# Visual Studio Code settings
+.vscode/
+
+# Editor-specific files
+*.sublime-project
+*.sublime-workspace
+*.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
